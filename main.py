@@ -1,58 +1,77 @@
-print("PROGRAMMING BASICS")
+from bs4 import BeautifulSoup
+import requests
+import time
+import random
+from urllib.parse import urlparse, urljoin
+import re
+import csv
 
-user_name = input("Enter your name: ")
+#Function that indexes the webpage
+def index_page(webpage, webpage_url):
 
-print(f"\n{user_name}, do you know what variables are? Yes/No")
+    #Collect title and description
+    title_tag = webpage.find('title')
+    title = title_tag.get_text().strip() if title_tag else 'No Title'
 
-while True:
-    variables = input("Answer: ").lower()
-
-    if variables in ["yes", "y"]:
-        print("\nGreat!")
-        print("A variable is a named box where you store a piece of information so you can use or change it later in your program.")
-        break
-    elif variables in ["no", "n"]:
-        print("\nNo problem! Let me explain.")
-        print("A variable is like a labeled box that stores information.")
-        break
+    #Collect description
+    description = ''
+    meta_description = webpage.find('meta', attrs={'name': 'description'})
+    if meta_description and 'content' in meta_description.attrs:
+        description = meta_description['content']
     else:
-        print("Please answer with yes or no.")
+        text_content = webpage.get_text(separator=" ", strip=True)
+        description = text_content[:200] + "..." if len(text_content) > 200 else text_content
 
-print("\nExample:")
-print("age = 15")
-print("Here, 'age' is the variable and 15 is the value stored inside it.")
+    # Grab all the words in the page
+    words = re.findall(r'\b\w+\b', webpage.get_text(separator=" ", strip=True).lower())
 
-print("\nDo you want to learn about data types? Yes/No")
+    # Double check and fliter out any numbers, symbols, etc
+    # WE ONLY WANT WORDS
+    words = [word for word in words if word.isalpha()]
 
-while True:
-    data_types = input("Answer: ").lower()
+    # Add the information to the index
+    indexed_page = {
+        "url": webpage_url,
+        "title": title,
+        "description": description,
+        "words": words
+    }
+    return indexed_page
 
-    if data_types in ["yes", "y"]:
-        print("\nData Types:")
-        print("1. int  → Whole numbers (e.g., 5, 10)")
-        print("2. float → Decimal numbers (e.g., 3.14)")
-        print("3. str  → Text (e.g., 'hello')")
-        print("4. bool → True or False")
-        break
-    elif data_types in ["no", "n"]:
-        print("\nAlright! We'll stop here.")
-        break
-    else:
-        print("Please answer with yes or no.")
+def web_crawler():
+    # our list of urls
+    urls = ["https://www.wikipedia.org/"]
+    visited_urls = set()
+    # Loops through the list of urls
+    while urls:
+        # grabs the next url
+        current_url = urls.pop()
+        print("time to crawl: " + current_url)
+        time.sleep(random.uniform(1, 3))
+        try:
+            response = requests.get(current_url)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            print(f"Failed to retrieve {current_url}: {e}")
+            continue
+        # grabbing the content of the page
+        webpage = BeautifulSoup(response.content, "html.parser")
 
-print("QUIZ TIME!")
-print("first question")
-answer = input("Is 3.14 an int or a float? ").lower()
-
-if answer == "float":
-    print("Correct!")
-else:
-    print("Not quite. 3.14 is a float because it has decimals.")
-
-print("second question")
-answer = input("What data type is 25? ").lower()
-
-if answer == "int":
-    print("Correct!")
-else:
-    print("Not quite. 25 is a int.")
+        # grabbing the links from the page
+        hyperlinks = webpage.select("a[href]")
+        # looping through the links and adding them to our list of urls
+        for hyperlink in hyperlinks:
+            url = hyperlink["href"]
+            #Formats the url into a proper url
+            if url.startswith("#"):
+                continue
+            if url.startswith("//"):
+                parsed_url = urlparse(current_url)
+                url = f"{parsed_url.scheme}:{url}"
+            elif not url.startswith("http"):
+                url = urljoin(current_url, url)
+            url = url.split('#')[0]
+            # If we havent visited this url yet, add it to our list
+            if url not in visited_urls:
+                urls.append(url)
+                visited_urls.add(url)
