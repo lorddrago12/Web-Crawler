@@ -4,7 +4,6 @@ import time
 import random
 from urllib.parse import urlparse, urljoin
 import re
-import csv
 
 #Function that indexes the webpage
 def index_page(webpage, webpage_url):
@@ -38,10 +37,45 @@ def index_page(webpage, webpage_url):
     }
     return indexed_page
 
+def compute_pagerank(graph, damping_factor=0.85, max_iterations=100, tol=1.0e-6):
+    # Build the set of all URLs
+    all_nodes = set(graph.keys())
+    for links in graph.values():
+        all_nodes.update(links)
+    num_nodes = len(all_nodes)
+    # Initialize PageRank scores
+    pagerank = {url: 1.0 / num_nodes for url in all_nodes}
+    # Identify dangling nodes (nodes with no outgoing links)
+    dangling_nodes = [url for url in all_nodes if url not in graph or len(graph[url]) == 0]
+    # Iterative computation
+    for iteration in range(max_iterations):
+        new_pagerank = {}
+        # Sum of PageRank scores from dangling nodes
+        dangling_sum = damping_factor * sum(pagerank[node] for node in dangling_nodes) / num_nodes
+        for url in all_nodes:
+            rank = (1.0 - damping_factor) / num_nodes
+            rank += dangling_sum
+            # Sum contributions from incoming links
+            for node in graph:
+                if url in graph[node]:
+                    out_degree = len(graph[node])
+                    rank += damping_factor * pagerank[node] / out_degree
+            new_pagerank[url] = rank
+        # Check for convergence
+        error = sum(abs(new_pagerank[url] - pagerank[url]) for url in all_nodes)
+        if error < tol:
+            print(f"Converged after {iteration + 1} iterations.")
+            break
+        pagerank = new_pagerank
+    return pagerank
+
 def web_crawler():
     # our list of urls
     urls = ["https://www.wikipedia.org/"]
     visited_urls = set()
+    indexed_pages = []  # Store indexed pages
+    graph = {}  # Store the link graph for PageRank
+    
     # Loops through the list of urls
     while urls:
         # grabs the next url
@@ -56,6 +90,14 @@ def web_crawler():
             continue
         # grabbing the content of the page
         webpage = BeautifulSoup(response.content, "html.parser")
+        
+        # Index the page
+        page_data = index_page(webpage, current_url)
+        indexed_pages.append(page_data)
+        print(f"Indexed: {page_data['title']}")
+        
+        # Initialize graph entry for current URL
+        graph[current_url] = []
 
         # grabbing the links from the page
         hyperlinks = webpage.select("a[href]")
@@ -75,3 +117,21 @@ def web_crawler():
             if url not in visited_urls:
                 urls.append(url)
                 visited_urls.add(url)
+            # Add to graph
+            graph[current_url].append(url)
+    
+    # Compute PageRank
+    print("\nComputing PageRank...")
+    pagerank_scores = compute_pagerank(graph)
+    
+    # Sort pages by PageRank
+    sorted_pages = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
+    
+    print("\nTop 10 pages by PageRank:")
+    for i, (url, score) in enumerate(sorted_pages[:10], 1):
+        print(f"{i}. {url}: {score:.6f}")
+    
+    return indexed_pages, graph, pagerank_scores
+
+if __name__ == "__main__":
+    web_crawler()
