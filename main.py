@@ -69,21 +69,34 @@ def compute_pagerank(graph, damping_factor=0.85, max_iterations=100, tol=1.0e-6)
         pagerank = new_pagerank
     return pagerank
 
-def web_crawler():
+def web_crawler(max_pages=50):
     # our list of urls
     urls = ["https://www.wikipedia.org/"]
     visited_urls = set()
     indexed_pages = []  # Store indexed pages
     graph = {}  # Store the link graph for PageRank
     
+    # Add headers to identify the crawler
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
     # Loops through the list of urls
-    while urls:
+    while urls and len(visited_urls) < max_pages:
         # grabs the next url
         current_url = urls.pop()
-        print("time to crawl: " + current_url)
+        
+        # Skip if already visited
+        if current_url in visited_urls:
+            continue
+            
+        # Mark as visited BEFORE crawling to avoid duplicates
+        visited_urls.add(current_url)
+        
+        print(f"time to crawl: {current_url} (Page {len(visited_urls)}/{max_pages})")
         time.sleep(random.uniform(1, 3))
         try:
-            response = requests.get(current_url)
+            response = requests.get(current_url, headers=headers, timeout=10)
             response.raise_for_status()
         except requests.RequestException as e:
             print(f"Failed to retrieve {current_url}: {e}")
@@ -116,18 +129,20 @@ def web_crawler():
             # If we havent visited this url yet, add it to our list
             if url not in visited_urls:
                 urls.append(url)
-                visited_urls.add(url)
             # Add to graph
             graph[current_url].append(url)
     
     # Compute PageRank
-    print("\nComputing PageRank...")
+    print(f"\nCrawled {len(visited_urls)} pages. Computing PageRank...")
     pagerank_scores = compute_pagerank(graph)
     
-    # Sort pages by PageRank
-    sorted_pages = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
+    # Filter to only show pages we actually visited
+    visited_pagerank = {url: score for url, score in pagerank_scores.items() if url in visited_urls}
     
-    print("\nTop 10 pages by PageRank:")
+    # Sort pages by PageRank
+    sorted_pages = sorted(visited_pagerank.items(), key=lambda x: x[1], reverse=True)
+    
+    print(f"\nTop {min(10, len(sorted_pages))} crawled pages by PageRank:")
     for i, (url, score) in enumerate(sorted_pages[:10], 1):
         print(f"{i}. {url}: {score:.6f}")
     
