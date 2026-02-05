@@ -1,4 +1,4 @@
-# Web Crawler
+# Web Crawler with PageRank
 
 A Python-based web crawler that recursively discovers and indexes web pages, then ranks them using the PageRank algorithm.
 
@@ -160,6 +160,7 @@ Main crawler function that discovers and processes web pages, builds the link gr
 - [ ] Export PageRank results to CSV or JSON
 - [ ] Visualize the link graph
 - [ ] Implement personalized PageRank
+
 ## License
 
 This project is provided as-is for educational purposes.
